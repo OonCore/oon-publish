@@ -32,4 +32,10 @@ if grep -R -n -E 'central-ativacao\.central\.oondemand\.online|legacy fallback|L
   exit 1
 fi
 
+# A promoção só fala com as mesmas Centrais que o request-dev aceita.
+promotion=".github/workflows/promote-environment.yml"
+test "$(grep -Fc 'allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-dev.oonapps.online"}' "$promotion")" = 2
+! grep -Fq 'central-ativacao-hml' "$promotion"
+python3 test/promote-endpoint-contract.py
+
 echo "Greenfield activation endpoint contracts ok"

@@ -36,6 +36,36 @@ jobs:
       id-token: write
       packages: read
     steps:
+      - name: Validar endpoint da Central
+        shell: bash
+        env:
+          ACTIVATION_API_URL: ${{ inputs.activation_api_url }}
+        run: |
+          set -euo pipefail
+          # Mesma lista de hosts do request-dev.yml. A URL recebe o token OIDC do
+          # executor e os callbacks de estado: só a Central de Produção e a de
+          # Desenvolvimento despacham promoções (a de Homologação é passiva).
+          python3 - "$ACTIVATION_API_URL" <<'PY'
+          import sys
+          from urllib.parse import urlsplit
+
+          raw = sys.argv[1]
+          if raw != raw.strip() or any(ord(ch) < 33 or ord(ch) == 127 for ch in raw):
+              raise SystemExit("activation_api_url não pode conter espaços ou caracteres de controle.")
+          parsed = urlsplit(raw)
+          allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-dev.oonapps.online"}
+          if parsed.scheme != "https":
+              raise SystemExit("activation_api_url deve usar HTTPS.")
+          if parsed.hostname not in allowed_hosts:
+              raise SystemExit("activation_api_url aponta para hostname não autorizado.")
+          if parsed.username or parsed.password or parsed.query or parsed.fragment:
+              raise SystemExit("activation_api_url não pode conter credenciais, query ou fragment.")
+          if parsed.port not in (None, 443):
+              raise SystemExit("activation_api_url deve usar a porta HTTPS padrão.")
+          if parsed.path.rstrip("/") != "/api":
+              raise SystemExit("activation_api_url deve terminar em /api.")
+          PY
+
       - name: Gerar token do Oon Control Plane
         id: control-plane-token
         uses: actions/create-github-app-token@v2
@@ -149,6 +179,36 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Validar endpoint da Central
+        shell: bash
+        env:
+          ACTIVATION_API_URL: ${{ inputs.activation_api_url }}
+        run: |
+          set -euo pipefail
+          # Mesma lista de hosts do request-dev.yml. A URL recebe o token OIDC do
+          # executor e os callbacks de estado: só a Central de Produção e a de
+          # Desenvolvimento despacham promoções (a de Homologação é passiva).
+          python3 - "$ACTIVATION_API_URL" <<'PY'
+          import sys
+          from urllib.parse import urlsplit
+
+          raw = sys.argv[1]
+          if raw != raw.strip() or any(ord(ch) < 33 or ord(ch) == 127 for ch in raw):
+              raise SystemExit("activation_api_url não pode conter espaços ou caracteres de controle.")
+          parsed = urlsplit(raw)
+          allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-dev.oonapps.online"}
+          if parsed.scheme != "https":
+              raise SystemExit("activation_api_url deve usar HTTPS.")
+          if parsed.hostname not in allowed_hosts:
+              raise SystemExit("activation_api_url aponta para hostname não autorizado.")
+          if parsed.username or parsed.password or parsed.query or parsed.fragment:
+              raise SystemExit("activation_api_url não pode conter credenciais, query ou fragment.")
+          if parsed.port not in (None, 443):
+              raise SystemExit("activation_api_url deve usar a porta HTTPS padrão.")
+          if parsed.path.rstrip("/") != "/api":
+              raise SystemExit("activation_api_url deve terminar em /api.")
+          PY
+
       - name: Registrar falha sanitizada
         continue-on-error: true
         shell: bash
