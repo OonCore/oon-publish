@@ -114,6 +114,7 @@ jobs:
         env:
           RELEASE_ID: ${{ inputs.release_id }}
           ACTIVATION_API_URL: ${{ inputs.activation_api_url }}
+          EXPECTED_OPERATION_TYPE: ${{ inputs.operation_type }}
         run: |
           node executor/backend/node_modules/@oondemand/oon-core-back/bin/delivery.js context             --release "$RELEASE_ID"             --api "$ACTIVATION_API_URL"             --phase deploy             --output "$RUNNER_TEMP/context.json"
 
@@ -122,7 +123,7 @@ jobs:
           lifecycle_mode="$(jq -r '.lifecycleMode // "tenant_activation"' "$RUNNER_TEMP/context.json")"
           deployment_id="$(jq -r '.deploymentId // empty' "$RUNNER_TEMP/context.json")"
           deployment_token="$(jq -r '.deploymentToken // empty' "$RUNNER_TEMP/context.json")"
-          test "$operation_type" = '${{ inputs.operation_type }}'
+          test "$operation_type" = "$EXPECTED_OPERATION_TYPE"
           if [[ "$lifecycle_mode" == "global_singleton" || "$lifecycle_mode" == "platform_shared" ]]; then
             test -n "$deployment_id"
             test -n "$deployment_token"
@@ -156,15 +157,20 @@ jobs:
 
       - name: Resumo auditável
         if: success()
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          OPERATION_TYPE: ${{ inputs.operation_type }}
         run: |
+          # Aspas simples no formato: crase dentro de aspas duplas é substituição
+          # de comando no bash e executaria o valor em vez de exibi-lo.
           {
             echo "## Promoção concluída"
             echo
-            echo "- Release: `${{ inputs.release_id }}`"
-            echo "- Operação: `${{ inputs.operation_type }}`"
-            echo "- Ambiente: `$(jq -r '.environment' "$RUNNER_TEMP/context.json")`"
-            echo "- Digest: `$IMAGE_DIGEST`"
-            echo "- Rebuild: `não`"
+            printf -- '- Release: `%s`\n' "$RELEASE_ID"
+            printf -- '- Operação: `%s`\n' "$OPERATION_TYPE"
+            printf -- '- Ambiente: `%s`\n' "$(jq -r '.environment' "$RUNNER_TEMP/context.json")"
+            printf -- '- Digest: `%s`\n' "$IMAGE_DIGEST"
+            printf -- '- Rebuild: `%s`\n' 'não'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - if: always()
