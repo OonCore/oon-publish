@@ -76,7 +76,7 @@ jobs:
           repositories: central-ativacao
 
       - name: Obter executor confiável
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: oondemand/central-ativacao
           token: ${{ steps.control-plane-token.outputs.token }}
@@ -85,11 +85,11 @@ jobs:
           persist-credentials: false
           submodules: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
 
-      - uses: azure/setup-kubectl@v4
+      - uses: azure/setup-kubectl@v5
 
       - name: Instalar runtime oficial
         working-directory: executor
