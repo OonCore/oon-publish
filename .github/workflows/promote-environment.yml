@@ -36,6 +36,36 @@ jobs:
       id-token: write
       packages: read
     steps:
+      - name: Validar endpoint da Central
+        shell: bash
+        env:
+          ACTIVATION_API_URL: ${{ inputs.activation_api_url }}
+        run: |
+          set -euo pipefail
+          # Mesma lista de hosts do request-dev.yml. A URL recebe o token OIDC do
+          # executor e os callbacks de estado: só a Central de Produção e a de
+          # Desenvolvimento despacham promoções (a de Homologação é passiva).
+          python3 - "$ACTIVATION_API_URL" <<'PY'
+          import sys
+          from urllib.parse import urlsplit
+
+          raw = sys.argv[1]
+          if raw != raw.strip() or any(ord(ch) < 33 or ord(ch) == 127 for ch in raw):
+              raise SystemExit("activation_api_url não pode conter espaços ou caracteres de controle.")
+          parsed = urlsplit(raw)
+          allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-dev.oonapps.online"}
+          if parsed.scheme != "https":
+              raise SystemExit("activation_api_url deve usar HTTPS.")
+          if parsed.hostname not in allowed_hosts:
+              raise SystemExit("activation_api_url aponta para hostname não autorizado.")
+          if parsed.username or parsed.password or parsed.query or parsed.fragment:
+              raise SystemExit("activation_api_url não pode conter credenciais, query ou fragment.")
+          if parsed.port not in (None, 443):
+              raise SystemExit("activation_api_url deve usar a porta HTTPS padrão.")
+          if parsed.path.rstrip("/") != "/api":
+              raise SystemExit("activation_api_url deve terminar em /api.")
+          PY
+
       - name: Gerar token do Oon Control Plane
         id: control-plane-token
         uses: actions/create-github-app-token@v2
@@ -46,7 +76,7 @@ jobs:
           repositories: central-ativacao
 
       - name: Obter executor confiável
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: oondemand/central-ativacao
           token: ${{ steps.control-plane-token.outputs.token }}
@@ -55,11 +85,11 @@ jobs:
           persist-credentials: false
           submodules: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
 
-      - uses: azure/setup-kubectl@v4
+      - uses: azure/setup-kubectl@v5
 
       - name: Instalar runtime oficial
         working-directory: executor
@@ -84,6 +114,7 @@ jobs:
         env:
           RELEASE_ID: ${{ inputs.release_id }}
           ACTIVATION_API_URL: ${{ inputs.activation_api_url }}
+          EXPECTED_OPERATION_TYPE: ${{ inputs.operation_type }}
         run: |
           node executor/backend/node_modules/@oondemand/oon-core-back/bin/delivery.js context             --release "$RELEASE_ID"             --api "$ACTIVATION_API_URL"             --phase deploy             --output "$RUNNER_TEMP/context.json"
 
@@ -92,7 +123,7 @@ jobs:
           lifecycle_mode="$(jq -r '.lifecycleMode // "tenant_activation"' "$RUNNER_TEMP/context.json")"
           deployment_id="$(jq -r '.deploymentId // empty' "$RUNNER_TEMP/context.json")"
           deployment_token="$(jq -r '.deploymentToken // empty' "$RUNNER_TEMP/context.json")"
-          test "$operation_type" = '${{ inputs.operation_type }}'
+          test "$operation_type" = "$EXPECTED_OPERATION_TYPE"
           if [[ "$lifecycle_mode" == "global_singleton" || "$lifecycle_mode" == "platform_shared" ]]; then
             test -n "$deployment_id"
             test -n "$deployment_token"
@@ -126,15 +157,20 @@ jobs:
 
       - name: Resumo auditável
         if: success()
+        env:
+          RELEASE_ID: ${{ inputs.release_id }}
+          OPERATION_TYPE: ${{ inputs.operation_type }}
         run: |
+          # Aspas simples no formato: crase dentro de aspas duplas é substituição
+          # de comando no bash e executaria o valor em vez de exibi-lo.
           {
             echo "## Promoção concluída"
             echo
-            echo "- Release: `${{ inputs.release_id }}`"
-            echo "- Operação: `${{ inputs.operation_type }}`"
-            echo "- Ambiente: `$(jq -r '.environment' "$RUNNER_TEMP/context.json")`"
-            echo "- Digest: `$IMAGE_DIGEST`"
-            echo "- Rebuild: `não`"
+            printf -- '- Release: `%s`\n' "$RELEASE_ID"
+            printf -- '- Operação: `%s`\n' "$OPERATION_TYPE"
+            printf -- '- Ambiente: `%s`\n' "$(jq -r '.environment' "$RUNNER_TEMP/context.json")"
+            printf -- '- Digest: `%s`\n' "$IMAGE_DIGEST"
+            printf -- '- Rebuild: `%s`\n' 'não'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - if: always()
@@ -149,6 +185,36 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - name: Validar endpoint da Central
+        shell: bash
+        env:
+          ACTIVATION_API_URL: ${{ inputs.activation_api_url }}
+        run: |
+          set -euo pipefail
+          # Mesma lista de hosts do request-dev.yml. A URL recebe o token OIDC do
+          # executor e os callbacks de estado: só a Central de Produção e a de
+          # Desenvolvimento despacham promoções (a de Homologação é passiva).
+          python3 - "$ACTIVATION_API_URL" <<'PY'
+          import sys
+          from urllib.parse import urlsplit
+
+          raw = sys.argv[1]
+          if raw != raw.strip() or any(ord(ch) < 33 or ord(ch) == 127 for ch in raw):
+              raise SystemExit("activation_api_url não pode conter espaços ou caracteres de controle.")
+          parsed = urlsplit(raw)
+          allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-dev.oonapps.online"}
+          if parsed.scheme != "https":
+              raise SystemExit("activation_api_url deve usar HTTPS.")
+          if parsed.hostname not in allowed_hosts:
+              raise SystemExit("activation_api_url aponta para hostname não autorizado.")
+          if parsed.username or parsed.password or parsed.query or parsed.fragment:
+              raise SystemExit("activation_api_url não pode conter credenciais, query ou fragment.")
+          if parsed.port not in (None, 443):
+              raise SystemExit("activation_api_url deve usar a porta HTTPS padrão.")
+          if parsed.path.rstrip("/") != "/api":
+              raise SystemExit("activation_api_url deve terminar em /api.")
+          PY
+
       - name: Registrar falha sanitizada
         continue-on-error: true
         shell: bash

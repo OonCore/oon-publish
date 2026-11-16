@@ -92,6 +92,12 @@ Ele recebe um `release_id`, obtém por OIDC o contexto canônico e aplica em
 Homologação ou Produção o `imageDigest` já validado em Dev. O workflow não faz
 checkout do App, não executa build e não publica uma nova imagem.
 
+Antes de emitir o token OIDC, o workflow valida `activation_api_url` com as mesmas
+regras do `request-dev.yml`: HTTPS, porta padrão, caminho `/api`, sem credenciais,
+query ou fragmento, e somente os hosts `central-ativacao.oonapps.online` e
+`central-ativacao-dev.oonapps.online`. Qualquer outro endereço encerra a execução
+sem token, sem kubeconfig e sem callback.
+
 O Control Plane recusa artefatos anteriores ao contrato neutro de ambiente,
 operações concorrentes, ausência de RBAC/entitlement/licença e Produção sem o
 aceite de Homologação quando exigido. Falhas preservam o histórico e podem ser
