@@ -57,6 +57,13 @@ codes = [
     ('app-cdev', False),
     ('app-chml', False),
     ('meus-apps-dev-cdev', False),
+    # Bordas: o qualificador só é reservado como último segmento.
+    ('cdev', True),
+    ('chml', True),
+    ('app-chml-v2', True),
+    ('app-cdev-dev', True),
+    ('app--chml', False),
+    ('a-cdev', False),
 ]
 for code, valid in codes:
     with tempfile.TemporaryDirectory() as directory:
@@ -68,3 +75,42 @@ for code, valid in codes:
         if not valid:
             assert 'sufixo reservado' in result.stderr, result.stderr
 print(f'{len(codes)} reserved app code cases passed')
+
+# Código fora do padrão (maiúsculas) é recusado pela validação geral, antes da
+# conferência do sufixo reservado.
+with tempfile.TemporaryDirectory() as directory:
+    root = Path(directory)
+    (root / 'oon.deploy.json').write_text(json.dumps({'appCode': 'APP-CDEV', 'schemaVersion': '1'}))
+    result = subprocess.run(['bash', '-c', manifest], cwd=directory,
+                            env={**os.environ, 'GITHUB_OUTPUT': str(root / 'output')}, capture_output=True, text=True)
+    assert result.returncode != 0 and 'appCode inválido' in result.stderr, result.stderr
+
+# A recusa do código reservado acontece antes de qualquer token OIDC: o passo de
+# validação vem antes do que pede o token, e só ele confere o sufixo.
+validate_at = source.index('      - name: Validar contrato de publicação\n')
+oidc_at = source.index('ACTIONS_ID_TOKEN_REQUEST_TOKEN')
+assert validate_at < source.index('      - name: Resolver endpoint canônico da Central\n') < oidc_at
+assert source.index('*-cdev || "$app_code" == *-chml') < oidc_at
+
+# Endpoint vindo da variável da organização também aceita só as três Centrais.
+for configured, ok in [
+    ('https://central-ativacao-hml.oonapps.online/api', True),
+    ('https://central-ativacao-dev.oonapps.online/api', True),
+    ('https://central-ativacao-sandbox.oonapps.online/api', False),
+    ('https://central-ativacao-chml.oonapps.online/api', False),
+]:
+    with tempfile.TemporaryDirectory() as directory:
+        output = Path(directory) / 'output'
+        env = {
+            **os.environ,
+            'INPUT_ACTIVATION_API_URL': '',
+            'ORGANIZATION_ACTIVATION_API_URL': configured,
+            'DEFAULT_ACTIVATION_API_URL': 'https://central-ativacao.oonapps.online/api',
+            'GITHUB_OUTPUT': str(output),
+            'GITHUB_STEP_SUMMARY': str(Path(directory) / 'summary'),
+        }
+        result = subprocess.run(['bash', '-c', endpoint], env=env, capture_output=True, text=True)
+        assert (result.returncode == 0) == ok, (configured, result.stderr)
+        if ok:
+            assert output.read_text().strip() == f'activation_api_url={configured}', output.read_text()
+print('ecosystem order and organization endpoint cases passed')
