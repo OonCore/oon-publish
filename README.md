@@ -59,9 +59,19 @@ O endpoint deve usar HTTPS, terminar em `/api` e apontar exatamente para o hostn
 OON_ACTIVATION_API_URL=https://central-ativacao.oonapps.online/api
 ```
 
-Credenciais na URL, query string, fragmento, porta alternativa e qualquer domínio legado são recusados. Inputs e variáveis organizacionais devem apontar para `https://central-ativacao.oonapps.online/api` ou, no caso dos Apps globais (Meus Apps, Oon Workspace e Oon Docs), para a Central de Desenvolvimento `https://central-ativacao-dev.oonapps.online/api`; outros hostnames são recusados.
+Credenciais na URL, query string, fragmento, porta alternativa e qualquer domínio legado são recusados. Inputs e variáveis organizacionais aceitam só as três Centrais; outros hostnames são recusados:
 
-A Central de Desenvolvimento tem banco próprio e é dona do ambiente Dev dos Apps globais; a Central de Homologação usa o banco de produção em modo passivo e não aceita solicitações de publicação (ver `docs/central-environments.md` na central-ativacao).
+| Central | Endpoint |
+| --- | --- |
+| Produção (padrão SaaS) | `https://central-ativacao.oonapps.online/api` |
+| Homologação | `https://central-ativacao-hml.oonapps.online/api` |
+| Desenvolvimento | `https://central-ativacao-dev.oonapps.online/api` |
+
+Desde o marco 0.3.0, cada Central é um **ecossistema isolado**: banco próprio, segredos próprios e os próprios Apps em Dev, Homologação e Produção. Detalhes no ADR 0010 do oon-k8s-infra e em `docs/central-environments.md` da central-ativacao.
+
+- A Central que criou o App é a dona dele. O scaffold do Oon Workspace grava a URL dela em `activation_api_url`, e o `publish-dev` do App sempre fala com essa Central.
+- Nenhuma Central importa releases de outra.
+- Os Apps da central-dev e da central-hml são publicados com os qualificadores `-cdev` e `-chml` no namespace e no host. Por isso, um `appCode` terminado em `-cdev` ou `-chml` é recusado já no `request-dev.yml`, antes de emitir o token OIDC. A Central também recusa, com `APP_CODE_RESERVED_SUFFIX`.
 
 ## Capabilities obrigatórias
 
@@ -94,9 +104,10 @@ checkout do App, não executa build e não publica uma nova imagem.
 
 Antes de emitir o token OIDC, o workflow valida `activation_api_url` com as mesmas
 regras do `request-dev.yml`: HTTPS, porta padrão, caminho `/api`, sem credenciais,
-query ou fragmento, e somente os hosts `central-ativacao.oonapps.online` e
-`central-ativacao-dev.oonapps.online`. Qualquer outro endereço encerra a execução
-sem token, sem kubeconfig e sem callback.
+query ou fragmento, e somente os hosts `central-ativacao.oonapps.online`,
+`central-ativacao-hml.oonapps.online` e `central-ativacao-dev.oonapps.online`.
+Cada Central promove os Apps do próprio ecossistema. Qualquer outro endereço
+encerra a execução sem token, sem kubeconfig e sem callback.
 
 O Control Plane recusa artefatos anteriores ao contrato neutro de ambiente,
 operações concorrentes, ausência de RBAC/entitlement/licença e Produção sem o
