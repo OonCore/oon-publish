@@ -43,8 +43,8 @@ jobs:
         run: |
           set -euo pipefail
           # Mesma lista de hosts do request-dev.yml. A URL recebe o token OIDC do
-          # executor e os callbacks de estado: só a Central de Produção e a de
-          # Desenvolvimento despacham promoções (a de Homologação é passiva).
+          # executor e os callbacks de estado: cada uma das três Centrais promove
+          # os Apps do próprio ecossistema (ADR 0010 do oon-k8s-infra).
           python3 - "$ACTIVATION_API_URL" <<'PY'
           import sys
           from urllib.parse import urlsplit
@@ -53,7 +53,7 @@ jobs:
           if raw != raw.strip() or any(ord(ch) < 33 or ord(ch) == 127 for ch in raw):
               raise SystemExit("activation_api_url não pode conter espaços ou caracteres de controle.")
           parsed = urlsplit(raw)
-          allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-dev.oonapps.online"}
+          allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-hml.oonapps.online", "central-ativacao-dev.oonapps.online"}
           if parsed.scheme != "https":
               raise SystemExit("activation_api_url deve usar HTTPS.")
           if parsed.hostname not in allowed_hosts:
@@ -192,8 +192,8 @@ jobs:
         run: |
           set -euo pipefail
           # Mesma lista de hosts do request-dev.yml. A URL recebe o token OIDC do
-          # executor e os callbacks de estado: só a Central de Produção e a de
-          # Desenvolvimento despacham promoções (a de Homologação é passiva).
+          # executor e os callbacks de estado: cada uma das três Centrais promove
+          # os Apps do próprio ecossistema (ADR 0010 do oon-k8s-infra).
           python3 - "$ACTIVATION_API_URL" <<'PY'
           import sys
           from urllib.parse import urlsplit
@@ -202,7 +202,7 @@ jobs:
           if raw != raw.strip() or any(ord(ch) < 33 or ord(ch) == 127 for ch in raw):
               raise SystemExit("activation_api_url não pode conter espaços ou caracteres de controle.")
           parsed = urlsplit(raw)
-          allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-dev.oonapps.online"}
+          allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-hml.oonapps.online", "central-ativacao-dev.oonapps.online"}
           if parsed.scheme != "https":
               raise SystemExit("activation_api_url deve usar HTTPS.")
           if parsed.hostname not in allowed_hosts:

@@ -68,6 +68,13 @@ jobs:
             echo "appCode inválido no oon.deploy.json: $app_code" >&2
             exit 1
           }
+          # -cdev e -chml são os qualificadores dos Apps da central-dev e da
+          # central-hml (ADR 0010 do oon-k8s-infra); a Central também recusa
+          # (APP_CODE_RESERVED_SUFFIX). Falha aqui, antes de emitir o OIDC.
+          if [[ "$app_code" == *-cdev || "$app_code" == *-chml ]]; then
+            echo "appCode $app_code termina em sufixo reservado aos ecossistemas da Central (-cdev, -chml)." >&2
+            exit 1
+          fi
 
           architecture='{}'
           capabilities="$(jq -ce '.capabilities // {} | if type == "object" then . else error("capabilities deve ser um objeto") end' oon.deploy.json)"
@@ -148,10 +155,10 @@ jobs:
 
           raw = sys.argv[1].strip()
           parsed = urlsplit(raw)
-          # Produção (padrão SaaS) e a Central de Desenvolvimento, que publica o
-          # Dev dos Apps globais com banco próprio. A Central de Homologação é
-          # passiva e nunca recebe solicitações de publicação.
-          allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-dev.oonapps.online"}
+          # As três Centrais (ADR 0010 do oon-k8s-infra): cada uma é um
+          # ecossistema isolado e publica os próprios Apps. Produção é o padrão
+          # SaaS; a Central que criou o App é a dona dele.
+          allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-hml.oonapps.online", "central-ativacao-dev.oonapps.online"}
           if parsed.scheme != "https":
               raise SystemExit("OON_ACTIVATION_API_URL deve usar HTTPS.")
           if parsed.hostname not in allowed_hosts:

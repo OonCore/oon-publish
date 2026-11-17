@@ -7,8 +7,9 @@ test -f "$workflow"
 grep -Fq 'DEFAULT_ACTIVATION_API_URL: https://central-ativacao.oonapps.online/api' "$workflow"
 grep -Fq 'configured="${INPUT_ACTIVATION_API_URL:-${ORGANIZATION_ACTIVATION_API_URL:-$DEFAULT_ACTIVATION_API_URL}}"' "$workflow"
 grep -Fq 'Origem: `SaaS default`' "$workflow"
-grep -Fq 'allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-dev.oonapps.online"}' "$workflow"
-! grep -Fq 'central-ativacao-hml' "$workflow"
+# As três Centrais (ADR 0010 do oon-k8s-infra): cada uma publica os próprios Apps.
+grep -Fq 'allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-hml.oonapps.online", "central-ativacao-dev.oonapps.online"}' "$workflow"
+grep -Fq 'sufixo reservado aos ecossistemas da Central (-cdev, -chml)' "$workflow"
 grep -Fq 'parsed.path.rstrip("/") != "/api"' "$workflow"
 grep -Fq 'parsed.port not in (None, 443)' "$workflow"
 grep -Fq 'parsed.username or parsed.password or parsed.query or parsed.fragment' "$workflow"
@@ -34,8 +35,12 @@ fi
 
 # A promoção só fala com as mesmas Centrais que o request-dev aceita.
 promotion=".github/workflows/promote-environment.yml"
-test "$(grep -Fc 'allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-dev.oonapps.online"}' "$promotion")" = 2
-! grep -Fq 'central-ativacao-hml' "$promotion"
+test "$(grep -Fc 'allowed_hosts = {"central-ativacao.oonapps.online", "central-ativacao-hml.oonapps.online", "central-ativacao-dev.oonapps.online"}' "$promotion")" = 2
+test "$(grep -c 'allowed_hosts = ' "$promotion")" = 2
 python3 test/promote-endpoint-contract.py
+python3 test/ecosystem-contract.py
+python3 test/executor-contract.py
+python3 test/executor-ecosystem-contract.py
+python3 test/milestone-name-contract.py
 
 echo "Greenfield activation endpoint contracts ok"
