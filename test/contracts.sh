@@ -41,5 +41,6 @@ python3 test/promote-endpoint-contract.py
 python3 test/ecosystem-contract.py
 python3 test/executor-contract.py
 python3 test/executor-ecosystem-contract.py
+python3 test/milestone-name-contract.py
 
 echo "Greenfield activation endpoint contracts ok"
