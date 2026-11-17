@@ -114,6 +114,57 @@ operações concorrentes, ausência de RBAC/entitlement/licença e Produção se
 aceite de Homologação quando exigido. Falhas preservam o histórico e podem ser
 reconciliadas de forma idempotente pelo Meus Apps.
 
+### Executor da promoção
+
+Este repositório não tem executor de deploy próprio. O `promote-environment.yml`:
+
+1. gera um token do Oon Control Plane que só alcança a `central-ativacao`;
+2. faz checkout de `oondemand/central-ativacao@main` em `executor/`, sem
+   credenciais persistidas;
+3. instala o runtime oficial com `scripts/actions/install-core.sh` e roda
+   `scripts/actions/publication-state.js` e
+   `scripts/actions/deploy-central-dev.js` de lá.
+
+A Central despacha a promoção em `oon-publish@main`
+(`PLATFORM_PROMOTION_REF`, padrão `main`), e a publicação Dev em
+`central-ativacao/publish-central-dev.yml@main` (`PLATFORM_DELIVERY_REF`), que
+roda o mesmo `deploy-central-dev.js`. Ou seja, quem aplica o digest em Dev, HML
+e Prod, para as três Centrais, é sempre o executor que está na `main` da
+central-ativacao no momento da execução, e não a versão da Central que está no
+ar. Por isso o executor da `main` precisa continuar compatível com as Centrais
+que ainda não foram atualizadas: no marco 0.3.0 ele deduz o ecossistema do
+namespace e do host da Central, sem campo novo no contexto.
+`test/executor-contract.py` fixa esse contrato e, com a central-ativacao
+clonada ao lado, confere que os arquivos e as opções usados existem.
+
+## Ordem de merge
+
+Ordem do marco 0.3.0 (um ecossistema por Central). Cada passo é um merge
+humano; nenhum deles dispara publicação, exceto onde indicado.
+
+1. **`oon-platform`**, com o OonCore 0.8.0 publicado no npm. O
+   `install-core.sh` do executor instala o Core do lock da central-ativacao, que
+   só resolve depois da publicação.
+2. **`oon-publish`** (este repositório). Só amplia a lista de Centrais aceitas
+   (inclui `central-ativacao-hml`) e recusa códigos `-cdev`/`-chml`. Com a
+   central-ativacao antiga na `main`, o executor continua recusando os
+   namespaces qualificados, então nada passa a ser publicado fora do
+   ecossistema de produção. Precisa vir antes da central-ativacao: depois
+   dela, a central-hml passa a `primary` e despacha promoções com o próprio
+   host, que a `main` antiga deste repositório recusaria.
+3. **`oon-k8s-infra`**. Os workers da produção não mudam. Os workers
+   `-cdev`/`-chml` só são instalados depois, pelo `configure-platform-integrations`.
+4. **`central-ativacao`**, com o `deploy-central-dev.js` que aceita os
+   namespaces `-cdev`/`-chml` e grava `oon.runtime/ecosystem`. A partir daqui, o
+   executor da promoção e o da publicação Dev são os novos. Com
+   `CENTRAL_DEV_AUTO_DEPLOY=true`, este merge já publica a central-dev.
+5. Só então os Apps publicam com `central=desenvolvimento` ou
+   `central=homologacao`.
+
+Os Apps consomem `request-dev.yml@main`, e a Central só aceita a identidade
+OIDC desse workflow em `refs/heads/main`. Uma branch deste repositório nunca é
+usada por Apps nem pela Central: as mudanças só valem depois do merge.
+
 
 ## Apps singleton tenantless e credenciais de Deployment
 

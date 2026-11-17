@@ -39,5 +39,6 @@ test "$(grep -Fc 'allowed_hosts = {"central-ativacao.oonapps.online", "central-a
 test "$(grep -c 'allowed_hosts = ' "$promotion")" = 2
 python3 test/promote-endpoint-contract.py
 python3 test/ecosystem-contract.py
+python3 test/executor-contract.py
 
 echo "Greenfield activation endpoint contracts ok"
